@@ -1,7 +1,9 @@
 <?php
 namespace cruxinator\TorClient\client;
-use cruxinator\TorClient\Lib\BigInteger;
-use cruxinator\TorClient\Lib\Logger;
+require_once(__DIR__ . '/../../vendor/autoload.php');
+
+use cruxinator\TorClient\lib\BigInteger;
+use cruxinator\TorClient\lib\Logger;
 use \Workerman\Worker;
 use \Workerman\Connection\AsyncTcpConnection;
 
@@ -39,11 +41,11 @@ class TorClient
     /**
      * @var String
      */
-    private $DirIP = "127.0.0.1";
+    private $DirIP = "194.109.206.212";
     /**
      * @var int
      */
-    private $DirPort = 9090;
+    private $DirPort = 80;
 
     function __construct()
     {
@@ -56,9 +58,10 @@ class TorClient
              * @param \Workerman\Connection\ConnectionInterface  $remote_connection
              */
             $this->client->onConnect = function($remote_connection) {
-
+die(var_dump($remote_connection));
                 $remote_connection->send("1");
             };
+            $this->client->connect();
             //$this->client = new Socket($this->DirIP, $this->DirPort);
         } catch (\Exception $ex) {
             self::$clientlog->severe("Can't connect to the directory. Exiting program...");
@@ -69,7 +72,7 @@ class TorClient
 
     public static function main()
     {
-        self::$clientlog->info("Tor Client running.");
+//        self::$clientlog->info("Tor Client running.");
         $object = new TorClient();
         $object->loginit();
         $object->FinalIP = "192.168.0.1";
@@ -111,6 +114,8 @@ class TorClient
             $this->directory = $buffer_str;
             $this->splitString($this->directory);
             $connection->close();
+            var_dump($this->directory );
+            die();
 
         };
         $this->client->connect();
@@ -231,3 +236,10 @@ class TorClient
         }
     }
 }
+$worker = new Worker();
+$worker->onWorkerStart = function()
+{
+    TorClient::main();
+};
+Worker::runAll();
+
