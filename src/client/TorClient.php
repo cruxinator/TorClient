@@ -4,9 +4,10 @@ require_once(__DIR__ . '/../../vendor/autoload.php');
 
 use cruxinator\TorClient\lib\BigInteger;
 use cruxinator\TorClient\lib\Logger;
-use \Workerman\Worker;
-use \Workerman\Connection\AsyncTcpConnection;
-
+use Kraken\Loop\Model\SelectLoop;
+use Kraken\Loop\Loop;
+use Kraken\Ipc\Socket\Socket;
+use Kraken\Stream\StreamInterface;
 class TorClient
 {
     /**
@@ -15,7 +16,7 @@ class TorClient
     private static $clientlog;
 
     /**
-     * @var \Workerman\Connection\ConnectionInterface
+     * @var StreamInterface
      */
     private $client;
     /**
@@ -52,20 +53,27 @@ class TorClient
         self::$clientlog = Logger::getLogger("client");
         self::$clientlog->info("Tor Client initialized.");
         try {
+            $loop = new Loop(new SelectLoop);
+
             //connect to directorey
-            $this->client = new AsyncTcpConnection('tcp://'.$this->DirIP .':'. $this->DirPort);
-            /**
-             * @param \Workerman\Connection\ConnectionInterface  $remote_connection
-             */
-            $this->client->onConnect = function($remote_connection) {
-die(var_dump($remote_connection));
-                $remote_connection->send("1");
-            };
-            $this->client->connect();
+            $this->client = new Socket('tcp://'.$this->DirIP .':'. $this->DirPort, $loop);
+            $this->client->on('data', function($socket, $data) {
+                $buffer_str = $this->bytesToString($data);
+                $this->directory = $buffer_str;
+                $this->splitString($this->directory);
+                $socket->close();
+                var_dump($this->directory );
+            });
+$loop->onStart(function() {
+    $this->client->write('1');
+});
+            $loop->start();
+            
             //$this->client = new Socket($this->DirIP, $this->DirPort);
         } catch (\Exception $ex) {
             self::$clientlog->severe("Can't connect to the directory. Exiting program...");
-            exit(0);
+            var_dump($ex);
+exit(0);
         }
 
     }
@@ -236,10 +244,4 @@ die(var_dump($remote_connection));
         }
     }
 }
-$worker = new Worker();
-$worker->onWorkerStart = function()
-{
     TorClient::main();
-};
-Worker::runAll();
-
