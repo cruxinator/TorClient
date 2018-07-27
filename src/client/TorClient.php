@@ -2,26 +2,18 @@
 namespace cruxinator\TorClient\client;
 use cruxinator\TorClient\Lib\BigInteger;
 use cruxinator\TorClient\Lib\Logger;
+use \Workerman\Worker;
+use \Workerman\Connection\AsyncTcpConnection;
+
 class TorClient
 {
     /**
      * @var Logger
      */
     private static $clientlog;
+
     /**
-     * @var DataInputStream
-     */
-    private $din;
-    /**
-     * @var DataOutputStream
-     */
-    private $dout;
-    /**
-     * @var BufferedReader
-     */
-    private $br;
-    /**
-     * @var Socket
+     * @var \Workerman\Connection\ConnectionInterface
      */
     private $client;
     /**
@@ -47,7 +39,7 @@ class TorClient
     /**
      * @var String
      */
-    private $DirIP = "192.168.0.111";
+    private $DirIP = "127.0.0.1";
     /**
      * @var int
      */
@@ -59,9 +51,15 @@ class TorClient
         self::$clientlog->info("Tor Client initialized.");
         try {
             //connect to directorey
-            $this->client = new Socket($this->DirIP, $this->DirPort);
-            $this->dout = new DataOutputStream($this->client->getOutputStream());
-            $this->dout->writeUTF("1");
+            $this->client = new AsyncTcpConnection('tcp://'.$this->DirIP .':'. $this->DirPort);
+            /**
+             * @param \Workerman\Connection\ConnectionInterface  $remote_connection
+             */
+            $this->client->onConnect = function($remote_connection) {
+
+                $remote_connection->send("1");
+            };
+            //$this->client = new Socket($this->DirIP, $this->DirPort);
         } catch (\Exception $ex) {
             self::$clientlog->severe("Can't connect to the directory. Exiting program...");
             exit(0);
@@ -69,14 +67,13 @@ class TorClient
 
     }
 
-    public static function main($args)
+    public static function main()
     {
         self::$clientlog->info("Tor Client running.");
         $object = new TorClient();
         $object->loginit();
         $object->FinalIP = "192.168.0.1";
-        $dir = $object->DirData();
-        $object->splitString($dir);
+        $object->DirData();
         //get request from client
         print("Enter data :");
         $message = readline();
@@ -92,7 +89,7 @@ class TorClient
     {
         try {
             $logFile = fopen("./TorClient.log", "w");
-            self::$clientlog->addHandler(logFile);
+            self::$clientlog->addHandler($logFile);
 
         } catch (\Exception $ex) {
             self::$clientlog->severe("Exception raised in creating log file. Exiting program.");
@@ -105,8 +102,18 @@ class TorClient
     private function DirData()
     {
         self::$clientlog->info("Fetching data from Tor Directory.");
-        $this->din = new DataInputStream($this->client->getInputStream());
-        $this->directory = $this->din -> readUTF();
+        /**
+         * @param \Workerman\Connection\ConnectionInterface $connection
+         * @param [] $buffer
+         */
+        $this->client->onMessage = function($connection, $buffer) {
+            $buffer_str = $this->bytesToString($buffer);
+            $this->directory = $buffer_str;
+            $this->splitString($this->directory);
+            $connection->close();
+
+        };
+        $this->client->connect();
         self::$clientlog->info("Data fetching finished.");
         return $this->directory;
     }
@@ -119,7 +126,7 @@ class TorClient
     private function splitString($directory)
     {
         $this->directory = $directory;
-        $splitData = split("/", $directory);
+        $splitData = explode("/", $directory);
         $j = 1;
         for ($i = 0; $i < 3; $i++) {
             //print(count($splitData) . "---"+$i);
@@ -133,8 +140,8 @@ class TorClient
     }
 
     /**
-     * @param byte[] $message
-     * @return byte[]
+     * @param [] $message
+     * @return []
      */
     private function makeOnion($message)
     {
@@ -155,10 +162,10 @@ class TorClient
     }
 
     /**
-     * @param byte[] $data
+     * @param [] $data
      * @param string $IP
      * @param int $i
-     * @return byte[]
+     * @return []
      */
     private function makeCell($data, $IP, $i)
     {
@@ -172,9 +179,9 @@ class TorClient
     }
 
     /**
-     * @param byte[] $peel
+     * @param [] $peel
      * @param int $i
-     * @return byte[]
+     * @return []
      */
     private function encrypt($peel, $i)
     {
@@ -190,6 +197,9 @@ class TorClient
      */
     private static function bytesToString($e)
     {
+        if(!is_array($e)){
+            return $e;
+        }
         //return implode(array_map("chr", $e));
         $test = "";
         foreach ($e as $b) {
@@ -199,16 +209,23 @@ class TorClient
     }
 
     /**
-     * @param byte[] $message_router1
+     * @param [] $message_router1
      */
     private function torouter1($message_router1)
     {
         try {
             self::$clientlog->info("Data being sent through Proxy Routers.");
-            $client = new Socket($this->IP[2], 9091);
-            $this->dout = new DataOutputStream($client->getOutputStream());
-            $this->dout->writeInt(count($message_router1));
-            $this->dout->write($message_router1);
+            $client = new AsyncTcpConnection('tcp://'.$this->IP[2] .':'. 9091);
+            /**
+             * @param \Workerman\Connection\ConnectionInterface $remote_connection
+             */
+            $client->onConnect = function($remote_connection) use($message_router1)
+            {
+                $remote_connection->send(count($message_router1));
+                $remote_connection->send($message_router1);
+                $remote_connection->close();
+            };
+            $client->connect();
         } catch (\Exception $ex) {
             self::$clientlog->severe("Data couldn't be sent to the Router. Exiting Program");
         }
