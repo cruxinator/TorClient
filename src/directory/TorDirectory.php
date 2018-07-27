@@ -2,17 +2,16 @@
 namespace cruxinator\TorClient\directory;
 use cruxinator\TorClient\Lib\BigInteger;
 use cruxinator\TorClient\Lib\Logger;
-
+use \Workerman\Worker;
+use \Workerman\WebServer;
+use \Workerman\Connection\TcpConnection;
+use \Workerman\Connection\AsyncTcpConnection;
 class TorDirectory
 {
     /**
      * @var Logger
      */
     private static $dirlog;
-    /**
-     * @var DataInputStream
-     */
-    private $req;
     /**
      * @var String
      */
@@ -50,7 +49,7 @@ class TorDirectory
      */
     private $id; //int
     /**
-     * @var ServerSocket
+     * @var Worker
      */
     private static $directory;
 
@@ -76,7 +75,8 @@ class TorDirectory
             self::$dirlog->info("Tor Directory running.");
             $tordir = new TorDirectory(); //create object
             $tordir->loginit();
-            self::$directory = new ServerSocket($tordir->DirPort, 10);
+            //self::$directory = new ServerSocket($tordir->DirPort, 10);
+            self::$directory = new Worker('tcp://0.0.0.0:' . $tordir->DirPort);
             while (true) {
                 $tordir->connect();                     //connect to node
 
@@ -102,47 +102,49 @@ class TorDirectory
     {
         try {
             self::$dirlog->info("Waiting to connect");
-            $incoming = new Socket();
-            try {
-                $incoming = self::$directory->accept();                                  //accept incoming socket request
-            } catch (\Exception $ex) {
-                self::$dirlog->warning("Couldn't connect to the node.");
-                return;
-            }
-            self::$dirlog->info("Node connected.");
-            $this->req = new DataInputStream($incoming->getInputStream());
-            $this->input = $this->req->readUTF();                                               //read input from node
-            //System.out.println(input);
-            $this->token = split("/", $this->input);
-            switch ($this->token[0])                                                    //check for header
+            self::$directory->onConnect= function($incoming)
             {
-                case "0":                                                       // if header=0 then it is a router
-                    self::$dirlog->info("Node identified as Router.");
-                    $this->id = 0;
-                    $this->router($incoming);
-                    break;
-                case "1":
-                    self::$dirlog->info("Node identified as Client.");                   //if header=1 then it is a client
-                    $this->id = 1;
-                    $this->client($incoming);
-                    break;
-                default:
-                    self::$dirlog->warning("Node can't be identified. Closing connection...");
-                    $this->id = 2;
-            }
-            $incoming->close();
+                self::$dirlog->info("Node connected.");
+            };
+            /**
+             * @param \Workerman\Connection\ConnectionInterface $connection
+             * @param Byte[] $buffer
+             */
+            self::$directory->onMessage = function($connection, $buffer) {
+                self::$dirlog->info("Node message received.");
+                $this->input = mb_convert_encoding(implode(array_map("chr", $buffer)), 'utf-8');//$this->req->readUTF();                                               //read input from node
+                //System.out.println(input);
+                $this->token = split("/", $this->input);
+                switch ($this->token[0])                                                    //check for header
+                {
+                    case "0":                                                       // if header=0 then it is a router
+                        self::$dirlog->info("Node identified as Router.");
+                        $this->id = 0;
+                        $this->router($connection);
+                        break;
+                    case "1":
+                        self::$dirlog->info("Node identified as Client.");                   //if header=1 then it is a client
+                        $this->id = 1;
+                        $this->client($connection);
+                        break;
+                    default:
+                        self::$dirlog->warning("Node can't be identified. Closing connection...");
+                        $this->id = 2;
+                }
+                $connection->close();
+            };
         } catch (\Exception $ex) {
             self::$dirlog->severe("Couldn't receive data from Node.");
         }
     }
 
     /**
-     * @param Socket $incoming
+     * @param \Workerman\Connection\ConnectionInterface $incoming
      */
     private function router($incoming)
     {
         self::$dirlog->info("Router operations initiated.");
-        $this->IP[$this->count] = "" . $incoming->getInetAddress();                                       //get ip address of the router node
+        $this->IP[$this->count] = "" . $incoming->getRemoteIp();                                       //get ip address of the router node
         $track = 1;
         for ($i = 0; $i < 3; $i++) {
             self::$dirlog->info("" . $track);
@@ -157,7 +159,7 @@ class TorDirectory
     }
 
     /**
-     * @param Socket $incoming
+     * @param \Workerman\Connection\ConnectionInterface $incoming
      */
     private function client($incoming)
     {
@@ -179,12 +181,14 @@ class TorDirectory
             $metadata .= $this->IP[$node] . "/" . $this->RSA[$node][0][$key] . "/" . $this->RSA[$node][1][$key--];
         }
         print($metadata);
+        $metadata_UTF = utf8_encode($metadata);
+        $metadata_bytes = unpack('C*', $metadata_UTF);
+
         try {
-            $response = new DataOutputStream($incoming->getOutputStream());
-            $response->writeUTF($metadata);
-            self::$dirlog->info("Data sent to Client " . $incoming->getInetAddress());
+            $incoming->send($metadata);
+            self::$dirlog->info("Data sent to Client " . $incoming->getRemoteIp());
         } catch (\Exception $ex) {
-            self::$dirlog->warning("Data couldn't be sent to Client: " . $incoming->getInetAddress());
+            self::$dirlog->warning("Data couldn't be sent to Client: " . $incoming->getRemoteIp());
         }
     }
 }
