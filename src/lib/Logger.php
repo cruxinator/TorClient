@@ -11,17 +11,20 @@ class Logger
     }
 
     public function info($message){
-
+        echo $message . "\r\n";
     }
 
     public function warning($message){
+        echo $message . "\r\n";
 
     }
 
     public function severe($message){
+        echo $message . "\r\n";
 
     }
     public function addHandler($fileHandle){
+        echo $message . "\r\n";
 
     }
 
