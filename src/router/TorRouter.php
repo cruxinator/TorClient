@@ -209,7 +209,7 @@ class TorRouter
         print("len=" . $len);
         print("keys to be used " . $key);
         print("Data to decrypt in bytes: " . self::bytesToString($data));
-        return (new BigInteger($data))->modPow(new BigInteger($this->D[$key]),new BigInteger($this->N[$key]))->toByteArray();
+        return (new BigInteger($data))->powMod(new BigInteger($this->D[$key]),new BigInteger($this->N[$key]))->toByteArray();
 
     }
 

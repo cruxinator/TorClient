@@ -172,7 +172,7 @@ class TorClient
         $p = $IP . "::" . implode(array_map("chr", $data));
         print($i . "th peel: " . $p);
         $peel = unpack('C*', $p);
-        $encPeel = $this->encrypt($peel, $i);
+        $encPeel = unpack('C*',$this->encrypt($peel, $i));
         print("encrypted peel in bytes--> " . $this->bytesToString($encPeel));
         print("len of encrypted peel in bytes--> " . count($encPeel));
         return $encPeel;
@@ -187,7 +187,7 @@ class TorClient
     {
         $e = new BigInteger($this->E[$i]);
         $n = new BigInteger($this->N[$i]);
-        $enc = (new BigInteger($peel)) -> modPow($e, $n) -> toByteArray();
+        $enc = (new BigInteger($peel)) -> powMod($e, $n) -> toBytes();
         return $enc;
     }
 
