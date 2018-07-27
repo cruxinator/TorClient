@@ -177,16 +177,12 @@ class TorDirectory
     {
         self::$dirlog->info("Client operations initiated.");
         $router = [];// int[3];
-        $router[0] = rand(0, $this->count); //(count should be excluded... is it?)
-        print($router[0]);
-        while (($router[1] = rand(0, $this->count)) == $router[0]) {
-            print("try" . $router[1]);
-        }
-        print($router[1]);
-        while ((($router[2] = rand(0, $this->count)) == $router[1]) || ($router[2] == $router[0])) {
-            print("try" . $router[2]);
-        }
-        print($router[2]);
+        // assumes that this->count is at least 3
+        $select = $this->randPerm($this->count);
+        $router[0] = $select[0];
+        $router[1] = $select[1];
+        $router[2] = $select[2];
+
         $metadata = "";
         $key = 2;
         foreach ($router as $node) {
@@ -199,5 +195,15 @@ class TorDirectory
         } catch (\Exception $ex) {
             self::$dirlog->warning("Data couldn't be sent to Client: " . $incoming->getRemoteIp());
         }
+    }
+    
+    private function randPerm($numEntries)
+    {
+        $payload = [];
+        for ($i = 0; $i < $numEntries; $i++) {
+            $payload[] = mt_rand();
+        }
+        asort($payload);
+        return array_keys($payload);
     }
 }
