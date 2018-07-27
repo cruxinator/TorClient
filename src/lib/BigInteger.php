@@ -135,7 +135,9 @@ if (S_MATH_BIGINTEGER_MODE == "gmp") {
         public function toNumber() {
             return gmp_intval($this->value);
         }
-
+        public function NextPrime($num) {
+            return gmp_nextprime($num);
+        }
         public function add($x) {
             return new BigInteger(gmp_add($this->value, BigInteger::getGmp($x)), true);
         }
@@ -631,6 +633,52 @@ else if (S_MATH_BIGINTEGER_MODE == "bcmath") {
 
         public function sign() {
             return $this->value[0] === "-" ? -1 : ($this->value === "0" ? 0 : 1);
+        }
+
+        public function NextPrime($num) {
+            if (!bccomp(bcmod($num, '2'), '0')) {
+                $num = bcsub($num, '1');
+            }
+            do {
+                $num = bcadd($num, '2');
+            } while (!$this->bcisprime($num));
+            return $num;
+        }
+
+        private function bcisprime($num) {
+            $primes = array(2, 3, 5, 7, 11, 13, 17);
+            for ($i = 0; $i < 7; $i++) {
+                if (!$this->bcmillertest($num, $primes[$i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private function bcmillertest($num, $base) {
+            if (!bccomp($num, '1')) {
+                return false;
+            }
+            $tmp = bcsub($num, '1');
+
+            $zero_bits = 0;
+            while (!bccomp(bcmod($tmp, '2'), '0')) {
+                $zero_bits++;
+                $tmp = bcdiv($tmp, '2');
+            }
+
+            $tmp = bcpowmod($base, $tmp, $num);
+            if (!bccomp($tmp, '1')) {
+                return true;
+            }
+
+            while ($zero_bits--) {
+                if (!bccomp(bcadd($tmp, '1'), $num)) {
+                    return true;
+                }
+                $tmp = bcpowmod($tmp, '2', $num);
+            }
+            return false;
         }
     }
 
