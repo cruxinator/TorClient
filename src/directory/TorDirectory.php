@@ -1,11 +1,8 @@
 <?php
 namespace cruxinator\TorClient\directory;
-use cruxinator\TorClient\Lib\BigInteger;
 use cruxinator\TorClient\Lib\Logger;
 use \Workerman\Worker;
-use \Workerman\WebServer;
-use \Workerman\Connection\TcpConnection;
-use \Workerman\Connection\AsyncTcpConnection;
+
 class TorDirectory
 {
     /**
@@ -55,7 +52,7 @@ class TorDirectory
 
     function __construct()
     {
-        $this->dirlog = Logger::getLogger("directory");
+        self::$dirlog = Logger::getLogger("directory");
         self::$dirlog->info("Tor Directory initialized.");
         $this->input = "";
         $this->id = 3;
@@ -102,19 +99,21 @@ class TorDirectory
     {
         try {
             self::$dirlog->info("Waiting to connect");
+            /**
+             * @param \Workerman\Connection\ConnectionInterface  $incoming
+             */
             self::$directory->onConnect= function($incoming)
             {
-                self::$dirlog->info("Node connected.");
+                self::$dirlog->info("Node connected from " . $incoming->getRemoteIp());
             };
             /**
              * @param \Workerman\Connection\ConnectionInterface $connection
-             * @param Byte[] $buffer
+             * @param [] $buffer
              */
             self::$directory->onMessage = function($connection, $buffer) {
                 self::$dirlog->info("Node message received.");
                 $this->input = mb_convert_encoding(implode(array_map("chr", $buffer)), 'utf-8');//$this->req->readUTF();                                               //read input from node
-                //System.out.println(input);
-                $this->token = split("/", $this->input);
+                $this->token = explode ("/", $this->input);
                 switch ($this->token[0])                                                    //check for header
                 {
                     case "0":                                                       // if header=0 then it is a router
@@ -181,9 +180,6 @@ class TorDirectory
             $metadata .= $this->IP[$node] . "/" . $this->RSA[$node][0][$key] . "/" . $this->RSA[$node][1][$key--];
         }
         print($metadata);
-        $metadata_UTF = utf8_encode($metadata);
-        $metadata_bytes = unpack('C*', $metadata_UTF);
-
         try {
             $incoming->send($metadata);
             self::$dirlog->info("Data sent to Client " . $incoming->getRemoteIp());
