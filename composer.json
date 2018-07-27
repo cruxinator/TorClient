@@ -9,7 +9,7 @@
         }
     ],
     "require": {
-        "dazzle-php/socket": "^0.4.1"
+        "workerman/workerman": "^3.5"
     },
     "autoload": {
       "psr-4": {
