@@ -1,0 +1,14 @@
+{
+    "name": "cruxinator/torclient",
+    "description": "A Tor Client for php",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Chris Harris",
+            "email": "c.harris@communicationinnovations.com.au"
+        }
+    ],
+    "require": {
+        "workerman/workerman": "^3.5"
+    }
+}
