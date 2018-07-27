@@ -1,7 +1,10 @@
 <?php
+
 namespace cruxinator\TorClient\directory;
-use cruxinator\TorClient\Lib\Logger;
+
+use cruxinator\TorClient\lib\Logger;
 use \Workerman\Worker;
+
 
 class TorDirectory
 {
@@ -75,7 +78,8 @@ class TorDirectory
             //self::$directory = new ServerSocket($tordir->DirPort, 10);
             self::$directory = new Worker('tcp://0.0.0.0:' . $tordir->DirPort);
             while (true) {
-                $tordir->connect();                     //connect to node
+                //connect to node
+                $tordir->connect();
 
             }
         } catch (\Exception $ex) {
@@ -112,17 +116,22 @@ class TorDirectory
              */
             self::$directory->onMessage = function($connection, $buffer) {
                 self::$dirlog->info("Node message received.");
-                $this->input = mb_convert_encoding(implode(array_map("chr", $buffer)), 'utf-8');//$this->req->readUTF();                                               //read input from node
+                //read input from node
+                $this->input = mb_convert_encoding(implode(array_map("chr", $buffer)), 'utf-8');//$this->req->readUTF();
                 $this->token = explode ("/", $this->input);
-                switch ($this->token[0])                                                    //check for header
+
+                //check for header
+                switch ($this->token[0])
                 {
-                    case "0":                                                       // if header=0 then it is a router
+                    // if header=0 then it is a router
+                    case "0":
                         self::$dirlog->info("Node identified as Router.");
                         $this->id = 0;
                         $this->router($connection);
                         break;
+                    //if header=1 then it is a client
                     case "1":
-                        self::$dirlog->info("Node identified as Client.");                   //if header=1 then it is a client
+                        self::$dirlog->info("Node identified as Client.");
                         $this->id = 1;
                         $this->client($connection);
                         break;
@@ -143,17 +152,21 @@ class TorDirectory
     private function router($incoming)
     {
         self::$dirlog->info("Router operations initiated.");
-        $this->IP[$this->count] = "" . $incoming->getRemoteIp();                                       //get ip address of the router node
+        //get ip address of the router node
+        $this->IP[$this->count] = "" . $incoming->getRemoteIp();
         $track = 1;
         for ($i = 0; $i < 3; $i++) {
             self::$dirlog->info("" . $track);
-            $this->RSA[$this->count][0][$i] = $this->token[$track++]; //E                                                   // get base of RSA key of the router node
-            $this->RSA[$this->count][1][$i] = $this->token[$track++];    //N                                                  //get exponent of RSA key of the router node
+            // get base of RSA key of the router node
+            $this->RSA[$this->count][0][$i] = $this->token[$track++]; //E
+            //get exponent of RSA key of the router node
+            $this->RSA[$this->count][1][$i] = $this->token[$track++];    //N
             self::$dirlog->info("\n=====>> IP=" . $this->IP[$this->count] .
-                "\nE[" . $i . "] = " . $this->RSA[$this->count][0][$i] .
-                "\nN[" . $i . "] = " . $this->RSA[$this->count][1][$i] . "\n");
+                                "\nE[" . $i . "] = " . $this->RSA[$this->count][0][$i] .
+                                "\nN[" . $i . "] = " . $this->RSA[$this->count][1][$i] . "\n");
         }
-        $this->status[$this->count++] = true;                                                         //mark the router online
+        //mark the router online
+        $this->status[$this->count++] = true;
         self::$dirlog->info("Number of routers online : " . $this->count);
     }
 
