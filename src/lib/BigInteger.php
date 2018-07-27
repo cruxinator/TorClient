@@ -135,6 +135,15 @@ if (S_MATH_BIGINTEGER_MODE == "gmp") {
         public function toNumber() {
             return gmp_intval($this->value);
         }
+        public static function probablePrime($bitlength){
+            $decLength = $bitlength/3.32192809489;
+            $string = strval(rand(1,9)); //make sure first digit is not zero;
+            for($i =0;$i<$decLength-1;$i++){
+                $string .= strval(rand(0,9));
+            }
+            $bigNum = new BigInteger($string);
+            return $bigNum->NextPrime($string);
+        }
         public function NextPrime($num) {
             return gmp_nextprime($num);
         }
@@ -634,7 +643,15 @@ else if (S_MATH_BIGINTEGER_MODE == "bcmath") {
         public function sign() {
             return $this->value[0] === "-" ? -1 : ($this->value === "0" ? 0 : 1);
         }
-
+        public static function probablePrime($bitlength){
+            $decLength = $bitlength/3.32192809489;
+            $string = strval(rand(1,9)); //make sure first digit is not zero;
+            for($i =0;$i<$decLength-1;$i++){
+                $string .= strval(rand(0,9));
+            }
+            $bigNum = new BigInteger($string);
+            return $bigNum->NextPrime($string);
+        }
         public function NextPrime($num) {
             if (!bccomp(bcmod($num, '2'), '0')) {
                 $num = bcsub($num, '1');
